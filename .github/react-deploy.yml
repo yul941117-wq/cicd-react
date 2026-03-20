@@ -49,7 +49,7 @@ jobs:
       #   빌드된 결과(dist 폴더)를 S3 버킷과 동기화  
       #   --delete : dist 폴더에 없는 파일은 제거 (S3에만 있는 파일을 제거)
       - name: Deploy to S3
-        run: |
+      
           aws s3 sync dist s3://${{ secrets.S3_BUCKET_NAME }} --delete
 
       # 7. CloudFront 캐시 무효화
@@ -57,4 +57,4 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
           --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-          --paths "/*"
+          --paths "/*"cd /c/study/koreait-study/6.\ CICD/cicd-react

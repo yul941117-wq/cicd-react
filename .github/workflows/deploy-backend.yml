@@ -1,0 +1,56 @@
+# 워크플로우 이름 (GitHub Action UI에 표시되는 이름)
+name: Spring Boot Deploy via SSM
+
+# 언제 실행할지 정의
+on:
+  push:
+    # master 브랜치에 push가 발생하면 실행하겠다
+    branches: ["master"]
+
+# Github Actions가 AWS OIDC 인증을 위해 필요한 권한 설정
+permissions:
+  id-token: write # OIDC 토큰 발급 쓰기 권한
+  contents: read # 저장소 코드 읽기 권한
+
+# 실행 단위 설정
+jobs: 
+  deploy:
+    # 실행 환경 (GitHub에서 제공하는 러너)
+    runs-on: ubuntu-latest
+    
+    # 실제로 수행할 명령
+    steps: 
+      # 1. GitHub 저장소 코드 체크아웃 (코드 가져오기)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Node.js 환경 세팅
+      - name: configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 3. 의존성 설치
+      - name: Build JAR
+        run: |
+          chmod +x gradlew
+          ./gredlew clean build -x test
+        
+      # 4. 리액트 프로젝트 빌드
+      - name: Upload JAR to S3
+        run: |
+          JAR_FILE=$(Is build/libs/*.jar | grep -v plain)
+          aws s3 cp "$JAR_FILE" s3://${{ secrets.BACKEND_BUCKET }}/app.jar
+        # 결과물(Artifact) 생성 : dist/
+
+      # 5. AWS 인증 (OIDC 방식)
+      - name: Deploy via SSM
+        run: |
+          aws ssm send-command \
+            --instence-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands-"[
+              \"aws s3 cp s3://${{ secrets.BACKEND_BUCKET }}/app.jar /home/ec2-user/app/app.jar\",
+              \"bash \home/ec2-user/app/deploy.sh\"
+              ]"
